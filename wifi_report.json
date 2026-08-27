@@ -1,0 +1,15 @@
+{
+    "scan_time": "2026-08-26 16:13:21",
+    "wifi_networks": {
+        "vivo t3x 5G": {
+            "Network Type": "Infrastructure",
+            "Authentication": "WPA2-Personal",
+            "Encryption": "CCMP"
+        }
+    },
+    "current_network": {
+        "IPv4": "10.53.129.25",
+        "Subnet Mask": "255.255.255.0",
+        "Gateway": "10.53.129.177"
+    }
+}
