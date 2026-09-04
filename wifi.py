@@ -1,671 +1,152 @@
 import subprocess
 import json
-import csv
 from datetime import datetime
 
-
-# STEP 1 — RUN SYSTEM COMMAND
-
-def run_command(command):
-    """
-    Run a Windows command and return its output.
-    """
-
-    try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="ignore"
-        )
-
-        if result.returncode != 0:
-            return ""
-
-        return result.stdout
-
-    except Exception as e:
-        print(f"Command Error: {e}")
-        return ""
-
-
-# STEP 2 — SCAN AVAILABLE WIFI NETWORKS
-
-def scan_wifi_networks():
-
-    output = run_command(
-        ["netsh", "wlan", "show", "networks"]
+# scan wifi 
+def scan_wifi():
+    result = subprocess.run(
+        ["netsh", "wlan", "show", "networks"],
+        capture_output=True, text=True, errors="ignore"
     )
 
-    wifi_networks = {}
-
-    if not output:
-        return wifi_networks
-
+    networks = {}
     ssid = None
 
-    for line in output.splitlines():
-
+    for line in result.stdout.splitlines():
         line = line.strip()
 
-        # SSID
         if line.startswith("SSID"):
-
             parts = line.split(":", 1)
-
             if len(parts) == 2:
-
                 ssid = parts[1].strip()
-
                 if ssid:
-                    wifi_networks[ssid] = {}
+                    networks[ssid] = {}
 
-        # Network Type
-        elif line.startswith("Network type") and ssid:
+        elif ssid and ":" in line:
+            key, value = line.split(":", 1)
 
-            wifi_networks[ssid]["Network Type"] = (
-                line.split(":", 1)[1].strip()
-            )
+            if key in ["Network type", "Authentication",
+                       "Encryption", "Signal", "Channel"]:
+                networks[ssid][key] = value.strip()
 
-        # Authentication
-        elif line.startswith("Authentication") and ssid:
+    return networks
 
-            wifi_networks[ssid]["Authentication"] = (
-                line.split(":", 1)[1].strip()
-            )
+# analyze security
+def analyze(details):
+    auth = details.get("Authentication", "").lower()
 
-        # Encryption
-        elif line.startswith("Encryption") and ssid:
+    if auth == "open":
+        return "WARNING - Open Network"
+    if "wpa3" in auth:
+        return "Excellent - WPA3"
+    if "wpa2" in auth:
+        return "Good - WPA2"
+    if "wpa" in auth:
+        return "Moderate - WPA"
+    if "wep" in auth:
+        return "WARNING - WEP"
 
-            wifi_networks[ssid]["Encryption"] = (
-                line.split(":", 1)[1].strip()
-            )
+    return "Unknown"
 
-        # Signal
-        elif line.startswith("Signal") and ssid:
+# show network (Display )
+def show_wifi(networks):
+    print("\n========== WIFI NETWORKS ==========")
 
-            wifi_networks[ssid]["Signal"] = (
-                line.split(":", 1)[1].strip()
-            )
-
-        # Channel
-        elif line.startswith("Channel") and ssid:
-
-            wifi_networks[ssid]["Channel"] = (
-                line.split(":", 1)[1].strip()
-            )
-
-    return wifi_networks
-
-
-# ============================================================
-# STEP 3 — GET CURRENT NETWORK INFORMATION
-# ============================================================
-
-def get_network_info():
-
-    output = run_command(["ipconfig"])
-
-    network_info = {}
-
-    if not output:
-        return network_info
-
-    gateway_found = False
-
-    for line in output.splitlines():
-
-        line = line.strip()
-
-        # IPv4
-        if line.startswith("IPv4 Address"):
-
-            network_info["IPv4"] = (
-                line.split(":", 1)[1].strip()
-            )
-
-        # Subnet Mask
-        elif line.startswith("Subnet Mask"):
-
-            network_info["Subnet Mask"] = (
-                line.split(":", 1)[1].strip()
-            )
-
-        # Default Gateway
-        elif line.startswith("Default Gateway"):
-
-            gateway = line.split(":", 1)[1].strip()
-
-            # IPv4 gateway
-            if "." in gateway:
-
-                network_info["Gateway"] = gateway
-                gateway_found = False
-
-            else:
-
-                # Gateway may be on next line
-                gateway_found = True
-
-        # Gateway continuation line
-        elif gateway_found and "." in line:
-
-            network_info["Gateway"] = line
-            gateway_found = False
-
-    return network_info
-
-
-# STEP 4 — SECURITY ANALYZER
-
-def analyze_network(details):
-
-    authentication = details.get(
-        "Authentication", ""
-    ).lower()
-
-    encryption = details.get(
-        "Encryption", ""
-    ).lower()
-
-    # Open network
-    if authentication == "open":
-
-        return {
-            "Status": "WARNING",
-            "Message": "Open Network - No Authentication"
-        }
-
-    # WPA3
-    elif "wpa3" in authentication:
-
-        return {
-            "Status": "Excellent",
-            "Message": "WPA3 Protected Network"
-        }
-
-    # WPA2
-    elif "wpa2" in authentication:
-
-        if encryption:
-
-            return {
-                "Status": "Good",
-                "Message": f"WPA2 with {encryption.upper()}"
-            }
-
-        return {
-            "Status": "Good",
-            "Message": "WPA2 Protected Network"
-        }
-
-    # WPA
-    elif "wpa" in authentication:
-
-        return {
-            "Status": "Moderate",
-            "Message": "WPA Protected Network"
-        }
-
-    # WEP
-    elif "wep" in authentication:
-
-        return {
-            "Status": "WARNING",
-            "Message": "WEP is an outdated security method"
-        }
-
-    else:
-
-        return {
-            "Status": "Unknown",
-            "Message": "Security information unavailable"
-        }
-
-
-# STEP 5 — DISPLAY ALL WIFI NETWORKS
-
-def display_wifi_networks(wifi_networks):
-
-    print("\n========================================")
-    print("        AVAILABLE WIFI NETWORKS")
-    print("========================================")
-
-    if not wifi_networks:
-
-        print("\nNo WiFi networks found.")
+    if not networks:
+        print("No networks found.")
         return
 
-    for number, (ssid, details) in enumerate(
-        wifi_networks.items(),
-        start=1
-    ):
+    for i, (ssid, data) in enumerate(networks.items(), 1):
+        print(f"\n[{i}] {ssid}")
+        print("Authentication:", data.get("Authentication", "N/A"))
+        print("Encryption    :", data.get("Encryption", "N/A"))
+        print("Signal        :", data.get("Signal", "N/A"))
+        print("Channel       :", data.get("Channel", "N/A"))
+        print("Security      :", analyze(data))
 
-        print(f"\n[{number}] {ssid}")
-
-        for key, value in details.items():
-
-            print(
-                f"    {key:<18}: {value}"
-            )
-
-        security = analyze_network(details)
-
-        print(
-            f"    {'Security Status':<18}: "
-            f"{security['Status']}"
-        )
-
-        print(
-            f"    {'Security Info':<18}: "
-            f"{security['Message']}"
-        )
-
-
-# STEP 6 — DISPLAY CURRENT NETWORK
-
-def display_network_info(network_info):
-
-    print("\n========================================")
-    print("        CURRENT NETWORK INFO")
-    print("========================================")
-
-    if not network_info:
-
-        print("\nNetwork information unavailable.")
-        return
-
-    for key, value in network_info.items():
-
-        print(
-            f"{key:<18}: {value}"
-        )
-
-
-# STEP 7 — SELECT WIFI NETWORK
-
-def select_network(wifi_networks):
-
-    if not wifi_networks:
-
-        print("\nNo networks available.")
-        return None
-
-    network_list = list(
-        wifi_networks.keys()
+# network incormation 
+def network_info():
+    result = subprocess.run(
+        ["ipconfig"],
+        capture_output=True, text=True, errors="ignore"
     )
 
-    print("\n========================================")
-    print("        SELECT WIFI NETWORK")
-    print("========================================")
+    info = {}
 
-    for number, ssid in enumerate(
-        network_list,
-        start=1
-    ):
+    for line in result.stdout.splitlines():
+        line = line.strip()
 
-        print(
-            f"[{number}] {ssid}"
-        )
+        if line.startswith("IPv4 Address"):
+            info["IPv4"] = line.split(":", 1)[1].strip()
 
-    try:
+        elif line.startswith("Subnet Mask"):
+            info["Subnet Mask"] = line.split(":", 1)[1].strip()
 
-        choice = int(
-            input("\nEnter network number: ")
-        )
+        elif line.startswith("Default Gateway"):
+            gateway = line.split(":", 1)[1].strip()
+            if gateway:
+                info["Gateway"] = gateway
 
-        if choice < 1 or choice > len(network_list):
-
-            print("\nInvalid network number.")
-            return None
-
-        selected_ssid = network_list[
-            choice - 1
-        ]
-
-        selected_details = (
-            wifi_networks[selected_ssid]
-        )
-
-        print("\n========================================")
-        print("        SELECTED NETWORK")
-        print("========================================")
-
-        print(
-            f"SSID               : {selected_ssid}"
-        )
-
-        for key, value in selected_details.items():
-
-            print(
-                f"{key:<18}: {value}"
-            )
-
-        security = analyze_network(
-            selected_details
-        )
-
-        print(
-            f"{'Security Status':<18}: "
-            f"{security['Status']}"
-        )
-
-        print(
-            f"{'Security Info':<18}: "
-            f"{security['Message']}"
-        )
-
-        return selected_ssid
-
-    except ValueError:
-
-        print("\nPlease enter a valid number.")
-        return None
+    return info
 
 
-# STEP 8 — CREATE JSON REPORT
-
-def export_json(wifi_networks, network_info):
-
+def save_report(networks, info):
     report = {
-
-        "scan_time": datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
-        ),
-
-        "wifi_networks": wifi_networks,
-
-        "current_network": network_info
+        "scan_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "wifi_networks": networks,
+        "current_network": info
     }
 
-    try:
+    with open("wifi_report.json", "w") as file:
+        json.dump(report, file, indent=4)
 
-        with open(
-            "wifi_report.json",
-            "w",
-            encoding="utf-8"
-        ) as file:
+    print("\nReport saved: wifi_report.json")
 
-            json.dump(
-                report,
-                file,
-                indent=4
-            )
-
-        print(
-            "\nJSON report created successfully:"
-        )
-
-        print("wifi_report.json")
-
-    except Exception as e:
-
-        print(
-            f"\nJSON export error: {e}"
-        )
-
-
-# STEP 9 — CREATE CSV REPORT
-
-def export_csv(wifi_networks):
-
-    try:
-
-        with open(
-            "wifi_report.csv",
-            "w",
-            newline="",
-            encoding="utf-8"
-        ) as file:
-
-            writer = csv.writer(file)
-
-            writer.writerow([
-                "SSID",
-                "Network Type",
-                "Authentication",
-                "Encryption",
-                "Signal",
-                "Channel",
-                "Security Status"
-            ])
-
-            for ssid, details in (
-                wifi_networks.items()
-            ):
-
-                security = analyze_network(
-                    details
-                )
-
-                writer.writerow([
-
-                    ssid,
-
-                    details.get(
-                        "Network Type",
-                        "N/A"
-                    ),
-
-                    details.get(
-                        "Authentication",
-                        "N/A"
-                    ),
-
-                    details.get(
-                        "Encryption",
-                        "N/A"
-                    ),
-
-                    details.get(
-                        "Signal",
-                        "N/A"
-                    ),
-
-                    details.get(
-                        "Channel",
-                        "N/A"
-                    ),
-
-                    security["Status"]
-                ])
-
-        print(
-            "\nCSV report created successfully:"
-        )
-
-        print("wifi_report.csv")
-
-    except Exception as e:
-
-        print(
-            f"\nCSV export error: {e}"
-        )
-
-
-# STEP 10 — BASIC NETWORK DIAGNOSTICS
-
-def ping_gateway(network_info):
-
-    gateway = network_info.get(
-        "Gateway"
-    )
-
-    if not gateway:
-
-        print(
-            "\nGateway address not available."
-        )
-
-        return
-
-    print(
-        f"\nTesting gateway: {gateway}"
-    )
-
-    result = subprocess.run(
-
-        [
-            "ping",
-            "-n",
-            "4",
-            gateway
-        ],
-
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="ignore"
-    )
-
-    print("\nPing Result:")
-    print(result.stdout)
-
-
-# STEP 11 — REFRESH SCAN
-
-def refresh_scan():
-
-    print(
-        "\nScanning WiFi networks..."
-    )
-
-    wifi_networks = scan_wifi_networks()
-
-    if wifi_networks:
-
-        print(
-            f"\n{len(wifi_networks)} "
-            "network(s) found."
-        )
-
-    else:
-
-        print(
-            "\nNo networks found."
-        )
-
-    return wifi_networks
-
-
-# STEP 12 — MENU
-
-def show_menu():
-
-    print("\n")
-    print("========================================")
-    print("        WIFI MANAGEMENT SYSTEM")
-    print("========================================")
-
-    print("1. Scan WiFi Networks")
-    print("2. Show Current Network Information")
-    print("3. Select & Analyze Network")
-    print("4. Export JSON Report")
-    print("5. Export CSV Report")
-    print("6. Ping Gateway")
-    print("7. Refresh WiFi Scan")
-    print("8. Exit")
-
-    print("========================================")
-
-
-# ============================================================
-# STEP 13 — MAIN PROGRAM
-# ============================================================
 
 def main():
+    print("\n==============================")
+    print("      WIFI SECURITY ANALYZER")
+    print("==============================")
 
-    print("========================================")
-    print("      WIFI MANAGEMENT & ANALYZER")
-    print("========================================")
-
-    print(
-        "\nInitializing WiFi Scanner..."
-    )
-
-    wifi_networks = scan_wifi_networks()
-
-    network_info = get_network_info()
+    networks = scan_wifi()
 
     while True:
+        print("\n1. Show WiFi Networks")
+        print("2. Current Network Info")
+        print("3. Save JSON Report")
+        print("4. Refresh Scan")
+        print("5. Exit")
 
-        show_menu()
+        choice = input("\nEnter choice: ")
 
-        choice = input(
-            "\nEnter your choice: "
-        ).strip()
-
-      
         if choice == "1":
-
-            display_wifi_networks(
-                wifi_networks
-            )
-
-   
+            show_wifi(networks)
 
         elif choice == "2":
+            info = network_info()
+            print("\n====== CURRENT NETWORK ======")
 
-            display_network_info(
-                network_info
-            )
-
-        
+            if info:
+                for key, value in info.items():
+                    print(f"{key}: {value}")
+            else:
+                print("Information unavailable.")
 
         elif choice == "3":
-
-            select_network(
-                wifi_networks
-            )
+            save_report(networks, network_info())
 
         elif choice == "4":
-
-            export_json(
-                wifi_networks,
-                network_info
-            )
-
+            print("\nScanning...")
+            networks = scan_wifi()
+            print(f"{len(networks)} network(s) found.")
 
         elif choice == "5":
-
-            export_csv(
-                wifi_networks
-            )
-
-
-        elif choice == "6":
-
-            ping_gateway(
-                network_info
-            )
-
-
-        elif choice == "7":
-
-            wifi_networks = refresh_scan()
-
-
-        elif choice == "8":
-
-            print(
-                "\nThank you for using "
-                "WiFi Management System."
-            )
-
+            print("\nThank you!")
             break
 
-        # Invalid Choice
-
         else:
-
-            print(
-                "\nInvalid choice. "
-                "Please select 1-8."
-            )
-
+            print("Invalid choice!")
 
 
 if __name__ == "__main__":
-
     main()
