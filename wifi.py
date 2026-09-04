@@ -596,17 +596,13 @@ def main():
             "\nEnter your choice: "
         ).strip()
 
-        # --------------------------------
-        # Option 1
-        # --------------------------------
-
+      
         if choice == "1":
 
             display_wifi_networks(
                 wifi_networks
             )
 
-        # Option 2
    
 
         elif choice == "2":
@@ -616,17 +612,12 @@ def main():
             )
 
         
-        # Option 3
-        
 
         elif choice == "3":
 
             select_network(
                 wifi_networks
             )
-
-        
-        # Option 4
 
         elif choice == "4":
 
@@ -635,15 +626,12 @@ def main():
                 network_info
             )
 
-        # Option 5
 
         elif choice == "5":
 
             export_csv(
                 wifi_networks
             )
-
-        # Option 6
 
 
         elif choice == "6":
@@ -652,13 +640,11 @@ def main():
                 network_info
             )
 
-        # Option 7
 
         elif choice == "7":
 
             wifi_networks = refresh_scan()
 
-        # Option 8
 
         elif choice == "8":
 
@@ -678,7 +664,6 @@ def main():
                 "Please select 1-8."
             )
 
-# PROGRAM START
 
 
 if __name__ == "__main__":
